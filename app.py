@@ -1,4 +1,6 @@
 import sqlite3
+from collections import defaultdict
+from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from database.db import get_db, init_db, seed_db
@@ -96,7 +98,39 @@ def logout():
 
 @app.route("/profile")
 def profile():
-    return "Profile page — coming in Step 4"
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    expenses = conn.execute(
+        "SELECT id, amount, category, date, description FROM expenses"
+        " WHERE user_id = ? ORDER BY date DESC",
+        (session["user_id"],)
+    ).fetchall()
+    conn.close()
+
+    current_month = datetime.now().strftime("%Y-%m")
+    total_this_month = sum(
+        row["amount"] for row in expenses
+        if row["date"].startswith(current_month)
+    )
+    expense_count = len(expenses)
+
+    if expenses:
+        cat_totals = defaultdict(float)
+        for row in expenses:
+            cat_totals[row["category"]] += row["amount"]
+        top_category = max(cat_totals, key=cat_totals.get)
+    else:
+        top_category = ""
+
+    return render_template(
+        "profile.html",
+        expenses=expenses,
+        total_this_month=total_this_month,
+        expense_count=expense_count,
+        top_category=top_category,
+    )
 
 
 @app.route("/expenses/add")
