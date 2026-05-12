@@ -96,6 +96,27 @@ def logout():
     return redirect(url_for("login"))
 
 
+def compute_profile_stats(expenses):
+    current_month = datetime.now().strftime("%Y-%m")
+    total_this_month = sum(
+        row["amount"] for row in expenses
+        if row["date"].startswith(current_month)
+    )
+    expense_count = len(expenses)
+    if expenses:
+        cat_totals = defaultdict(float)
+        for row in expenses:
+            cat_totals[row["category"]] += row["amount"]
+        top_category = max(cat_totals, key=cat_totals.get)
+    else:
+        top_category = ""
+    return {
+        "total_this_month": total_this_month,
+        "expense_count": expense_count,
+        "top_category": top_category,
+    }
+
+
 @app.route("/profile")
 def profile():
     if not session.get("user_id"):
@@ -109,27 +130,14 @@ def profile():
     ).fetchall()
     conn.close()
 
-    current_month = datetime.now().strftime("%Y-%m")
-    total_this_month = sum(
-        row["amount"] for row in expenses
-        if row["date"].startswith(current_month)
-    )
-    expense_count = len(expenses)
-
-    if expenses:
-        cat_totals = defaultdict(float)
-        for row in expenses:
-            cat_totals[row["category"]] += row["amount"]
-        top_category = max(cat_totals, key=cat_totals.get)
-    else:
-        top_category = ""
+    stats = compute_profile_stats(expenses)
 
     return render_template(
         "profile.html",
         expenses=expenses,
-        total_this_month=total_this_month,
-        expense_count=expense_count,
-        top_category=top_category,
+        total_this_month=stats["total_this_month"],
+        expense_count=stats["expense_count"],
+        top_category=stats["top_category"],
     )
 
 
